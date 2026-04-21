@@ -8,6 +8,7 @@ if (!process.env.RAILWAY_ENVIRONMENT) {
 
 
 const app= express();
+app.use(cors({origin:"*"}))
 const server = http.createServer(app); // ← créer un serveur HTTP
 app.use(express.json());
 app.use(cors());
