@@ -114,4 +114,19 @@ router.delete('/reclamations/:id', verifierToken, verifierRole('admin'), async (
         res.status(500).json({ erreur: 'Erreur serveur' });
     }
 });
+router.get('/reviews', verifierToken, verifierRole('admin'), async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT r.*, u.nom as client_nom, s.nom as service_nom
+            FROM reviews r
+            JOIN users u ON r.user_id = u.id
+            JOIN services s ON r.service_id = s.id
+            ORDER BY r.created_at DESC
+        `);
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ erreur: 'Erreur serveur' });
+    }
+});
 module.exports = router;
