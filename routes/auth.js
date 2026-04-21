@@ -20,11 +20,10 @@ router.post('/register',async(req,res)=>{
         }
         const hash= await bcrypt.hash(password,10)
         const result= await pool.query('INSERT INTO users (nom,email,password,role) VALUES ($1,$2,$3,$4) RETURNING id,nom,email',[nom,email,hash,role]);
-        // Après avoir créé le user
         if (role === 'prestataire') {
             await pool.query(
                 'INSERT INTO prestataires (user_id, specialite, disponible) VALUES ($1, $2, $3)',
-                [newUser.id, 'General', true]
+                [result.rows[0].id, 'General', true]
             );
         }
         res.status(201).json({user:result.rows[0]})
@@ -34,7 +33,6 @@ router.post('/register',async(req,res)=>{
         res.status(500).json({erreur:'Erreur serveur'})
     }
 })
-
 
 router.post('/login',async(req,res)=>{
     try{
@@ -51,22 +49,23 @@ router.post('/login',async(req,res)=>{
         if(!ok){
             return res.status(401).json({erreur:'password incorrecte'})
         }
+        const secret = process.env.JWT_SECRET || 'homeservices_secret_key_2026';
         const token=jwt.sign(
             {userId:user.id,
              email:user.email,
              role:user.role
             },
-            process.env.JWT_SECRET,
+            secret,
             {expiresIn:'7d'}
         )
         res.json({
             token:token,
             user:{id: user.id, nom: user.nom, email: user.email, role: user.role }
         });
-
     }catch(err){
         console.error(err);
         res.status(500).json({ erreur: 'Erreur serveur' });
     }
 })
+
 module.exports = router;
