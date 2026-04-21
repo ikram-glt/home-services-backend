@@ -1,7 +1,12 @@
 const express = require('express');
 const cors = require('cors');
-const http    = require('http');
-require('dotenv').config();
+const http = require('http');
+
+if (!process.env.RAILWAY_ENVIRONMENT) {
+  require('dotenv').config();
+}
+
+
 const app= express();
 const server = http.createServer(app); // ← créer un serveur HTTP
 app.use(express.json());
