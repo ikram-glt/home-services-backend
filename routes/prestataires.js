@@ -42,35 +42,38 @@ router.patch('/me/profil', verifierToken, async (req, res) => {
     try {
         const userId = req.userId;
         const {
-            telephone, adresse, tarif_horaire,
-            specialites, disponibilites,
-            entreprise, rc, secteur,
-            annee_creation, ville, metier
-        } = req.body;
+    telephone, adresse, tarif_horaire,
+    specialites, disponibilites,
+    entreprise, rc, secteur,
+    annee_creation, ville, metier,
+    latitude, longitude
+    } = req.body;
 
-        const update = await pool.query(`
-            UPDATE prestataires SET
-                telephone = $1,
-                adresse = $2,
-                tarif_horaire = $3,
-                specialites = $4,
-                disponibilites = $5,
-                entreprise = $6,
-                rc = $7,
-                secteur = $8,
-                annee_creation = $9,
-                ville = $10,
-                metier = $11
-            WHERE user_id = $12
-            RETURNING *
-        `, [
-            telephone, adresse, tarif_horaire,
-            specialites, disponibilites,
-            entreprise, rc, secteur,
-            annee_creation, ville, metier,
-            userId
-        ]);
-
+       const update = await pool.query(`
+        UPDATE prestataires SET
+        telephone = $1,
+        adresse = $2,
+        tarif_horaire = $3,
+        specialites = $4,
+        disponibilites = $5,
+        entreprise = $6,
+        rc = $7,
+        secteur = $8,
+        annee_creation = $9,
+        ville = $10,
+        metier = $11,
+        latitude = $12,
+        longitude = $13
+        WHERE user_id = $14
+        RETURNING *
+    `, [
+        telephone, adresse, tarif_horaire,
+        specialites, disponibilites,
+        entreprise, rc, secteur,
+        annee_creation, ville, metier,
+        latitude ?? null, longitude ?? null,
+        userId
+    ]);
         res.json(update.rows[0]);
     } catch (err) {
         console.error(err);
