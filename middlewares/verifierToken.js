@@ -9,7 +9,8 @@ async function verifierToken(req, res, next) {
     }
     const token = authHeader.split(' ')[1];
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const secret = process.env.JWT_SECRET || 'homeservices_secret_key_2026';
+        const decoded = jwt.verify(token, secret);
         req.userId = decoded.userId;
         const result = await pool.query(
         'SELECT role FROM users WHERE id = $1',
