@@ -129,4 +129,38 @@ router.get('/reviews', verifierToken, verifierRole('admin'), async (req, res) =>
         res.status(500).json({ erreur: 'Erreur serveur' });
     }
 });
+// Valider un prestataire
+router.patch('/prestataires/:id/valider', verifierToken, verifierRole('admin'), async (req, res) => {
+    try {
+        const id = req.params.id;
+        await pool.query(
+            'UPDATE prestataires SET est_verifie=true WHERE user_id=$1',
+            [id]
+        );
+        // Notifier le prestataire
+        await pool.query(
+            'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
+            [id, 'Votre profil a ete verifie et valide par l\'admin !']
+        );
+        res.json({ message: 'Prestataire valide !' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ erreur: 'Erreur serveur' });
+    }
+});
+
+// Révoquer validation
+router.patch('/prestataires/:id/revoquer', verifierToken, verifierRole('admin'), async (req, res) => {
+    try {
+        const id = req.params.id;
+        await pool.query(
+            'UPDATE prestataires SET est_verifie=false WHERE user_id=$1',
+            [id]
+        );
+        res.json({ message: 'Validation revoquee !' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ erreur: 'Erreur serveur' });
+    }
+});
 module.exports = router;
