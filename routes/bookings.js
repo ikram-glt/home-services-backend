@@ -38,12 +38,16 @@ router.get('/', verifierToken, async (req, res) => {
         }else {
             // Client voit seulement SES reservations
             result = await pool.query(`
-                SELECT b.*, s.nom as service_nom 
-                FROM bookings b 
-                JOIN services s ON b.service_id = s.id 
-                WHERE b.user_id = $1
-                ORDER BY b.created_at DESC
-            `, [userId]);
+    SELECT b.*, s.nom as service_nom,
+    p.user_id as prestataire_user_id,
+    u.nom as prestataire_nom
+    FROM bookings b 
+    JOIN services s ON b.service_id = s.id
+    LEFT JOIN prestataires p ON b.prestataire_id = p.id
+    LEFT JOIN users u ON p.user_id = u.id
+    WHERE b.user_id = $1
+    ORDER BY b.created_at DESC
+`, [userId]);
         }
 
         res.json(result.rows);
