@@ -27,11 +27,12 @@ const initSocket = (server) => {
         });
 
         socket.on('envoyer_message', async ({ bookingId, senderId, receiverId, contenu }) => {
-            try {
-                const result = await pool.query(`
-                    INSERT INTO messages (booking_id, sender_id, receiver_id, contenu)
-                    VALUES ($1, $2, $3, $4) RETURNING *
-                `, [bookingId, senderId, receiverId, contenu]);
+    try {
+        const receiverIdInt = receiverId && receiverId !== '' ? parseInt(receiverId) : null;
+        const result = await pool.query(`
+            INSERT INTO messages (booking_id, sender_id, receiver_id, contenu)
+            VALUES ($1, $2, $3, $4) RETURNING *
+        `, [bookingId, senderId, receiverIdInt, contenu]);
 
                 const message = result.rows[0];
 
