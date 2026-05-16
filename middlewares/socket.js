@@ -49,10 +49,13 @@ const initSocket = (server) => {
                 });
 
                 // Notification au destinataire
-                await pool.query(
-                    'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
-                    [receiverId, `Nouveau message de ${senderNom}`]
-                );
+                // Notification au destinataire seulement si receiverId valide
+                if (receiverIdInt) {
+                    await pool.query(
+                        'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
+                        [receiverIdInt, `Nouveau message de ${senderNom}`]
+                    );
+                }
 
             } catch (err) {
                 console.error('[Chat] Erreur:', err);
