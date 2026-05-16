@@ -109,17 +109,9 @@ router.patch('/:id/status', verifierToken, async (req, res) => {
         let result;
 
         if (status === 'confirme') {
-    // userId ici c'est le user_id du prestataire connecté
-    // On cherche son prestataire_id
-    const prestaResult = await pool.query(
-        'SELECT id FROM prestataires WHERE user_id=$1',
-        [userId]
-    );
-    const prestaId = prestaResult.rows[0]?.id;
-    
     result = await pool.query(
-        'UPDATE bookings SET status=$1, prestataire_id=$2, prestataire_user_id=$3 WHERE id=$4 RETURNING *',
-        [status, prestaId, userId, id]
+        'UPDATE bookings SET status=$1, prestataire_id=$2, prestataire_user_id=$2 WHERE id=$3 RETURNING *',
+        [status, userId, id]
     );
 } else {
             result = await pool.query(
