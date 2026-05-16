@@ -60,14 +60,23 @@ router.get('/', verifierToken, async (req, res) => {
 // POST — créer une reservation
 router.post('/', verifierToken, async (req, res) => {
     try {
-        const { user_id, service_id, date, heure } = req.body;
+        const { user_id, service_id, date, heure, description_intervention } = req.body;
         if (!user_id || !service_id || !date) {
             return res.status(400).json({ erreur: 'donnees obligatoires' });
         }
 
+        // Classifier l'urgence
+        const { classerUrgence } = require('../algorithmes/urgencyClassifier');
+        const urgence = description_intervention 
+            ? classerUrgence(description_intervention) 
+            : { label: 'Normale', niveau: 1 };
+        const estUrgent = urgence.niveau >= 2;
+
         const booking = await pool.query(
-            'INSERT INTO bookings (user_id, service_id, date, heure) VALUES ($1,$2,$3,$4) RETURNING *',
-            [user_id, service_id, date, heure]
+            `INSERT INTO bookings 
+             (user_id, service_id, date, heure, description_intervention, est_urgent, niveau_urgence) 
+             VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+            [user_id, service_id, date, heure, description_intervention, estUrgent, urgence.label]
         );
 
         // Notif pour le client
@@ -75,9 +84,13 @@ router.post('/', verifierToken, async (req, res) => {
             'SELECT nom FROM services WHERE id = $1', [service_id]
         );
         const serviceNom = service.rows[0]?.nom || 'Service';
+        
+        let notifMsg = `Votre reservation pour "${serviceNom}" le ${date} a ete envoyee !`;
+        if (estUrgent) notifMsg += ` ⚠️ Urgence ${urgence.label} detectee.`;
+        
         await pool.query(
             'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
-            [user_id, `Votre reservation pour "${serviceNom}" le ${date} a ete envoyee !`]
+            [user_id, notifMsg]
         );
 
         res.status(201).json(booking.rows[0]);
