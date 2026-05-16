@@ -4,9 +4,13 @@ const verifierToken = require('../middlewares/verifierToken');
 const verifierRole  = require('../middlewares/role');
 router.get('/users',verifierToken, verifierRole('admin'),async(req,res)=>{
     try{
-        const cherch=await pool.query(`SELECT id, nom, email, role, created_at 
-            FROM users
-            ORDER BY created_at DESC`)
+        const cherch = await pool.query(`
+                SELECT u.id, u.nom, u.email, u.role, u.created_at,
+                p.est_verifie
+                FROM users u
+                LEFT JOIN prestataires p ON p.user_id = u.id
+                ORDER BY u.created_at DESC
+            `)
         res.json(cherch.rows)
 
     }catch(err){
