@@ -1,9 +1,12 @@
 const { Pool } = require('pg');
-require('dotenv').config();
+
+if (!process.env.RAILWAY_ENVIRONMENT && !process.env.RENDER) {
+  require('dotenv').config();
+}
 
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL || 'postgresql://postgres:ycKKQtKvuSsgNZbJHiSrsmuEfxdbSVUm@postgres.railway.internal:5432/railway',
-    ssl: false
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.RENDER ? { rejectUnauthorized: false } : false
 });
 
 pool.connect()

@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             Int             @id @default(autoincrement())
+  email          String          @unique
+  nom            String
+  motDePasse     String
+  telephone      String?
+  role           String          @default("CLIENT")
+  createdAt      DateTime        @default(now())
+  demandes       Demande[]       @relation("ClientDemandes")
+  avis           Avis[]
+  communications Communication[] @relation("ClientCommunications")
+}
+
+model Prestataire {
+  id             Int             @id @default(autoincrement())
+  email          String          @unique
+  nom            String
+  motDePasse     String
+  competences    String?
+  latitude       Float?
+  longitude      Float?
+  disponible     Boolean         @default(true)
+  noteMoyenne    Float           @default(0)
+  createdAt      DateTime        @default(now())
+  demandes       Demande[]       @relation("PrestataireDemandes")
+  avis           Avis[]
+  communications Communication[] @relation("PrestataireCommunications")
+}
+
+model Service {
+  id          Int       @id @default(autoincrement())
+  titre       String
+  description String?
+  prix        Float
+  demandes    Demande[]
+}
+
+model Demande {
+  id                  Int          @id @default(autoincrement())
+  clientId            Int
+  prestataireId       Int?
+  serviceId           Int?
+  dateDepot           DateTime     @default(now())
+  datePlanifiee       DateTime?
+  dateFinIntervention DateTime?
+  adresseIntervention String?
+  latitude            Float?
+  longitude           Float?
+  montantEstime       Float?
+  isUrgent            Boolean      @default(false)
+  description         String?
+  status              String       @default("EN_ATTENTE")
+  sourceIoT           Boolean      @default(false)
+  deviceId            String?
+  faultType           String?
+  client              User         @relation("ClientDemandes", fields: [clientId], references: [id])
+  prestataire         Prestataire? @relation("PrestataireDemandes", fields: [prestataireId], references: [id])
+  service             Service?     @relation(fields: [serviceId], references: [id])
+  avis                Avis[]
+}
+
+model Avis {
+  id            Int          @id @default(autoincrement())
+  clientId      Int
+  prestataireId Int?
+  demandeId     Int
+  note          Int
+  commentaires  String?
+  date          DateTime     @default(now())
+  client        User         @relation(fields: [clientId], references: [id])
+  prestataire   Prestataire? @relation(fields: [prestataireId], references: [id])
+  demande       Demande      @relation(fields: [demandeId], references: [id])
+}
+
+model Communication {
+  id            Int          @id @default(autoincrement())
+  type          String
+  duration      Int?
+  status        String
+  createdAt     DateTime     @default(now())
+  clientId      Int
+  prestataireId Int?
+  client        User         @relation("ClientCommunications", fields: [clientId], references: [id])
+  prestataire   Prestataire? @relation("PrestataireCommunications", fields: [prestataireId], references: [id])
+}

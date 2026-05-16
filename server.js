@@ -1,27 +1,35 @@
-const express = require('express');
-const cors = require('cors');
-const http = require('http');
-
+// Dotenv uniquement en local (pas sur Railway)
 if (!process.env.RAILWAY_ENVIRONMENT) {
   require('dotenv').config();
 }
 
+const express = require('express');
+const cors = require('cors');
+const http = require('http');
 
-const app= express();
-app.use(cors({origin:"*"}))
-const server = http.createServer(app); // ← créer un serveur HTTP
+const app = express();
+
+// Configuration CORS
+app.use(cors({ origin: "*" }));
 app.use(express.json());
-app.use(cors());
-const { initSocket } = require('./middlewares/socket');
-const io = initSocket(server); // ← initialiser avec le serveur HTTP
-app.set('io', io);
-require('./config/db')
 
-const authRouter=require('./routes/auth')
-const servicesRouter=require('./routes/services')
-const bookingsRouter=require('./routes/bookings')
+// Création du serveur HTTP (nécessaire pour Socket.io)
+const server = http.createServer(app);
+
+// Initialisation de Socket.io
+const { initSocket } = require('./middlewares/socket');
+const io = initSocket(server);
+app.set('io', io);
+
+// Connexion à la base de données
+require('./config/db');
+
+// --- IMPORTATION DES ROUTES ---
+const authRouter = require('./routes/auth');
+const servicesRouter = require('./routes/services');
+const bookingsRouter = require('./routes/bookings');
 const prestatairesRouter = require('./routes/prestataires');
-const adminRouter        = require('./routes/admin');
+const adminRouter = require('./routes/admin');
 const reviewsRouter = require('./routes/reviews');
 const usersRouter = require('./routes/users');
 const reclamationsRouter = require('./routes/reclamations');
@@ -30,23 +38,34 @@ const recommendationsRouter = require('./routes/recommendations');
 const iotRouter = require('./routes/iot');
 const forgotRouter = require('./routes/forgot');
 const adressesRouter = require('./routes/adresses');
-app.use('/api/adresses', adressesRouter);
-app.use('/api/forgot', forgotRouter);
-app.use('/api/iot', iotRouter);
-app.use('/api/recommendations', recommendationsRouter);
-app.use('/api/notifications', notificationsRouter);
-app.use('/api/reclamations', reclamationsRouter);
-app.use('/api/users', usersRouter);
-app.use('/api/auth',authRouter)
-app.use('/api/services',servicesRouter)
-app.use('/api/bookings',bookingsRouter)
-app.use('/api/prestataires', prestatairesRouter);
-app.use('/api/admin',        adminRouter);
-app.use('/api/reviews', reviewsRouter);
+const adminStatsRoutes = require('./src/routes/adminStats');
+const communicationsRoutes = require('./src/routes/communications');
 
-app.get('/',(req,res)=>{
-    res.json({ message: 'API HomeServices operationnelle !' });
+// --- ENREGISTREMENT DES ROUTES ---
+app.use('/api/admin', adminStatsRoutes);
+app.use('/api/communications', communicationsRoutes);
+app.use('/api/auth', authRouter);
+app.use('/api/services', servicesRouter);
+app.use('/api/bookings', bookingsRouter);
+app.use('/api/prestataires', prestatairesRouter);
+app.use('/api/admin', adminRouter);
+app.use('/api/reviews', reviewsRouter);
+app.use('/api/users', usersRouter);
+app.use('/api/reclamations', reclamationsRouter);
+app.use('/api/notifications', notificationsRouter);
+app.use('/api/recommendations', recommendationsRouter);
+app.use('/api/iot', iotRouter);
+app.use('/api/forgot', forgotRouter);
+app.use('/api/adresses', adressesRouter);
+
+app.get('/', (req, res) => {
+    res.json({ message: 'API HomeServices opérationnelle !' });
 });
-const port= process.env.PORT || 3000;
-server.listen(port, () => { // ← server.listen au lieu de app.listen
-    console.log(`Serveur demarre sur http://localhost:${port}`);});
+
+// --- LANCEMENT DU SERVEUR ---
+const PORT = process.env.PORT || 5000;
+
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`✅ Serveur démarré sur port ${PORT}`);
+    console.log(`🚀 Socket.io est prêt`);
+});
