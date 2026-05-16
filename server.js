@@ -28,6 +28,8 @@ const recommendationsRouter = require('./routes/recommendations');
 const iotRouter = require('./routes/iot');
 const forgotRouter = require('./routes/forgot');
 const adressesRouter = require('./routes/adresses');
+const messagesRouter = require('./routes/messages');
+app.use('/api/messages', messagesRouter);
 app.use('/api/adresses', adressesRouter);
 app.use('/api/forgot', forgotRouter);
 app.use('/api/iot', iotRouter);

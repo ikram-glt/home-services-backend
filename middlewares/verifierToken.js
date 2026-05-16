@@ -2,6 +2,14 @@ const jwt = require('jsonwebtoken');
 const pool=require('../config/db');
 
 async function verifierToken(req, res, next) {
+    const decoded = jwt.verify(token, secret);
+    req.userId = decoded.userId;
+    const result = await pool.query(
+    'SELECT role, nom FROM users WHERE id = $1',
+    [decoded.userId]
+    );
+    req.userRole = result.rows[0].role;
+    req.userName = result.rows[0].nom;
     const authHeader = req.headers.authorization;
     console.log('authHeader:', authHeader);
     if (!authHeader) {

@@ -20,7 +20,50 @@ const initSocket = (server) => {
             console.log(`[Socket] Client ${clientId} → room client_${clientId}`);
         });
 
-        // Étape 3A — Client ACCEPTE
+        // ── CHAT EN TEMPS RÉEL ──
+        socket.on('join_booking', ({ bookingId, userId }) => {
+            socket.join(`booking_${bookingId}`);
+            console.log(`[Chat] User ${userId} rejoint booking_${bookingId}`);
+        });
+
+        socket.on('envoyer_message', async ({ bookingId, senderId, receiverId, contenu }) => {
+            try {
+                const result = await pool.query(`
+                    INSERT INTO messages (booking_id, sender_id, receiver_id, contenu)
+                    VALUES ($1, $2, $3, $4) RETURNING *
+                `, [bookingId, senderId, receiverId, contenu]);
+
+                const message = result.rows[0];
+
+                // Récupérer le nom de l'expéditeur
+                const userResult = await pool.query(
+                    'SELECT nom FROM users WHERE id=$1', [senderId]
+                );
+                const senderNom = userResult.rows[0]?.nom || 'Inconnu';
+
+                // Émettre à tous dans la room
+                io.to(`booking_${bookingId}`).emit('nouveau_message', {
+                    ...message,
+                    sender_nom: senderNom
+                });
+
+                // Notification au destinataire
+                await pool.query(
+                    'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
+                    [receiverId, `Nouveau message de ${senderNom}`]
+                );
+
+            } catch (err) {
+                console.error('[Chat] Erreur:', err);
+                socket.emit('erreur_message', { message: 'Erreur envoi message' });
+            }
+        });
+
+        socket.on('leave_booking', ({ bookingId }) => {
+            socket.leave(`booking_${bookingId}`);
+        });
+
+        // ── IOT ──
         socket.on('client:accepter_demande', async ({ demandeId }) => {
             const entry = pendingDemandes.get(demandeId);
             if (!entry) {
@@ -34,12 +77,9 @@ const initSocket = (server) => {
             const { demande } = entry;
 
             try {
-                // Créer la demande dans PostgreSQL
                 const result = await pool.query(
-                    `INSERT INTO bookings 
-                     (user_id, service_id, date, heure, status) 
-                     VALUES ($1, $2, $3, $4, $5) 
-                     RETURNING *`,
+                    `INSERT INTO bookings (user_id, service_id, date, heure, status) 
+                     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
                     [
                         demande.clientId,
                         demande.serviceId || 1,
@@ -50,9 +90,7 @@ const initSocket = (server) => {
                 );
 
                 const nouvelleReservation = result.rows[0];
-                console.log(`[IoT] Reservation ${nouvelleReservation.id} creee`);
 
-                // Créer une notification
                 await pool.query(
                     'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
                     [demande.clientId, `Votre demande IoT a ete enregistree !`]
@@ -68,13 +106,10 @@ const initSocket = (server) => {
 
             } catch (error) {
                 console.error('[IoT] Erreur PostgreSQL :', error);
-                socket.emit('iot:erreur', {
-                    message: 'Erreur lors de la creation de la demande.'
-                });
+                socket.emit('iot:erreur', { message: 'Erreur lors de la creation de la demande.' });
             }
         });
 
-        // Étape 3B — Client REFUSE
         socket.on('client:refuser_demande', ({ demandeId, raison }) => {
             const entry = pendingDemandes.get(demandeId);
             if (!entry) return;
@@ -83,7 +118,6 @@ const initSocket = (server) => {
             pendingDemandes.delete(demandeId);
 
             const { demande } = entry;
-            console.log(`[IoT] Demande ${demandeId} refusee`);
 
             io.to(`client_${demande.clientId}`).emit('iot:demande_refusee', {
                 demandeId,
@@ -93,38 +127,24 @@ const initSocket = (server) => {
             });
         });
 
-        // Panne IoT détectée
         socket.on('iot:panne_detectee', async ({ clientId, deviceId, faultType, description }) => {
             const demandeId = `iot_${Date.now()}`;
-            const demande = {
-                id: demandeId,
-                clientId,
-                deviceId,
-                faultType,
-                description,
-                createdAt: new Date()
-            };
+            const demande = { id: demandeId, clientId, deviceId, faultType, description, createdAt: new Date() };
 
-            // Étape 1 — Notification immédiate
             io.to(`client_${clientId}`).emit('iot:notification', {
                 title: `Panne detectee : ${faultType}`,
-                body: description,
-                deviceId,
-                demandeId
+                body: description, deviceId, demandeId
             });
 
-            // Étape 2 — Proposition après 2s
             setTimeout(() => {
                 const timer = setTimeout(() => {
                     pendingDemandes.delete(demandeId);
                     io.to(`client_${clientId}`).emit('iot:demande_expiree', {
-                        demandeId,
-                        message: 'Demande expiree apres 5 minutes.'
+                        demandeId, message: 'Demande expiree apres 5 minutes.'
                     });
                 }, DECISION_TIMEOUT_MS);
 
                 pendingDemandes.set(demandeId, { demande, timer, clientId });
-
                 io.to(`client_${clientId}`).emit('iot:demande_proposee', demande);
             }, 2000);
         });
