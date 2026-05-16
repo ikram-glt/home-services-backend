@@ -2,18 +2,31 @@ const express = require('express');
 const cors = require('cors');
 const http = require('http');
 
-if (!process.env.RAILWAY_ENVIRONMENT) {
+if (!process.env.RAILWAY_ENVIRONMENT && !process.env.RENDER) {
   require('dotenv').config();
 }
-const app= express();
-app.use(cors({origin:"*"}))
-const server = http.createServer(app); // ← créer un serveur HTTP
+
+const app = express();
+app.use(cors({ origin: '*' }));
+const server = http.createServer(app);
 app.use(express.json());
-app.use(cors());
+
 const { initSocket } = require('./middlewares/socket');
-const io = initSocket(server); // ← initialiser avec le serveur HTTP
+const io = initSocket(server);
 app.set('io', io);
-require('./config/db')
+require('./config/db');
+
+// Keep-alive pour Render
+if (process.env.RENDER) {
+  const https = require('https');
+  setInterval(() => {
+    https.get('https://home-services-backend-1fl1.onrender.com', (res) => {
+      console.log(`[Keep-alive] ${res.statusCode}`);
+    }).on('error', (err) => {
+      console.error('[Keep-alive] Erreur:', err.message);
+    });
+  }, 10 * 60 * 1000);
+}
 
 const authRouter=require('./routes/auth')
 const servicesRouter=require('./routes/services')
