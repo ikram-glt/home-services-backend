@@ -64,5 +64,23 @@ router.patch('/:bookingId/lu', verifierToken, async (req, res) => {
     res.status(500).json({ erreur: 'Erreur serveur' });
   }
 });
+// GET tous les messages (admin)
+router.get('/all', verifierToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT m.*, 
+      u1.nom as sender_nom, 
+      u2.nom as receiver_nom
+      FROM messages m
+      JOIN users u1 ON m.sender_id = u1.id
+      LEFT JOIN users u2 ON m.receiver_id = u2.id
+      ORDER BY m.created_at DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erreur: 'Erreur serveur' });
+  }
+});
 
 module.exports = router;
