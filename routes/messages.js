@@ -2,6 +2,25 @@ const router = require('express').Router();
 const pool = require('../config/db');
 const verifierToken = require('../middlewares/verifierToken');
 
+// GET tous les messages (admin) — DOIT ETRE AVANT /:bookingId
+router.get('/all', verifierToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT m.*, 
+      u1.nom as sender_nom, 
+      u2.nom as receiver_nom
+      FROM messages m
+      JOIN users u1 ON m.sender_id = u1.id
+      LEFT JOIN users u2 ON m.receiver_id = u2.id
+      ORDER BY m.created_at DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erreur: 'Erreur serveur' });
+  }
+});
+
 // GET messages d'une conversation (booking)
 router.get('/:bookingId', verifierToken, async (req, res) => {
   try {
@@ -33,7 +52,6 @@ router.post('/', verifierToken, async (req, res) => {
 
     const message = result.rows[0];
 
-    // Émettre via Socket.io
     const io = req.app.get('io');
     if (io) {
       io.to(`booking_${booking_id}`).emit('nouveau_message', {
@@ -59,24 +77,6 @@ router.patch('/:bookingId/lu', verifierToken, async (req, res) => {
       [bookingId, userId]
     );
     res.json({ message: 'Messages lus' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ erreur: 'Erreur serveur' });
-  }
-});
-// GET tous les messages (admin)
-router.get('/all', verifierToken, async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT m.*, 
-      u1.nom as sender_nom, 
-      u2.nom as receiver_nom
-      FROM messages m
-      JOIN users u1 ON m.sender_id = u1.id
-      LEFT JOIN users u2 ON m.receiver_id = u2.id
-      ORDER BY m.created_at DESC
-    `);
-    res.json(result.rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ erreur: 'Erreur serveur' });
