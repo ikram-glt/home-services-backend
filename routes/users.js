@@ -24,12 +24,17 @@ router.get('/:id', verifierToken, async (req, res) => {
 router.patch('/:id', verifierToken, async (req, res) => {
     try {
         const id = req.params.id;
-        const { nom, email } = req.body;
+        const { nom, email, latitude, longitude, adresse } = req.body;
         const update = await pool.query(`
-            UPDATE users SET nom=$1, email=$2
-            WHERE id=$3
-            RETURNING id, nom, email, role, created_at
-        `, [nom, email, id]);
+            UPDATE users SET 
+            nom=COALESCE($1, nom), 
+            email=COALESCE($2, email),
+            latitude=COALESCE($3, latitude),
+            longitude=COALESCE($4, longitude),
+            adresse=COALESCE($5, adresse)
+            WHERE id=$6
+            RETURNING id, nom, email, role, telephone, latitude, longitude, adresse
+        `, [nom, email, latitude, longitude, adresse, id]);
         res.json(update.rows[0]);
     } catch (err) {
         console.error(err);
