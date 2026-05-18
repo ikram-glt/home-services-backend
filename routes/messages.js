@@ -2,17 +2,25 @@ const router = require('express').Router();
 const pool = require('../config/db');
 const verifierToken = require('../middlewares/verifierToken');
 
-// GET tous les messages (admin) — DOIT ETRE AVANT /:bookingId
+// GET conversations groupées (admin)
 router.get('/all', verifierToken, async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT m.*, 
-      u1.nom as sender_nom, 
-      u2.nom as receiver_nom
+      SELECT 
+        m.booking_id,
+        u1.nom as client_nom,
+        u2.nom as prestataire_nom,
+        COUNT(m.id) as nombre_messages,
+        MAX(m.created_at) as derniere_activite,
+        (SELECT contenu FROM messages 
+         WHERE booking_id = m.booking_id 
+         ORDER BY created_at DESC LIMIT 1) as dernier_message
       FROM messages m
-      JOIN users u1 ON m.sender_id = u1.id
-      LEFT JOIN users u2 ON m.receiver_id = u2.id
-      ORDER BY m.created_at DESC
+      JOIN bookings b ON m.booking_id = b.id
+      JOIN users u1 ON b.user_id = u1.id
+      LEFT JOIN users u2 ON b.prestataire_user_id = u2.id
+      GROUP BY m.booking_id, u1.nom, u2.nom
+      ORDER BY derniere_activite DESC
     `);
     res.json(result.rows);
   } catch (err) {
