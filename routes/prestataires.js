@@ -2,6 +2,27 @@ const router = require('express').Router();
 const pool = require('../config/db');
 const verifierToken = require('../middlewares/verifierToken');
 
+
+
+// GET prestataire par user_id — AVANT /:id
+router.get('/user/:userId', async (req, res) => {
+    try {
+        const userId = req.params.userId;
+        const result = await pool.query(`
+            SELECT p.*, u.nom, u.email
+            FROM prestataires p
+            JOIN users u ON p.user_id = u.id
+            WHERE p.user_id = $1
+        `, [userId]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ erreur: 'Prestataire introuvable' });
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ erreur: 'Erreur serveur' });
+    }
+});
 // GET tous les prestataires
 router.get('/', async (req, res) => {
     try {
