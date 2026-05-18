@@ -59,7 +59,23 @@ router.get('/', verifierToken, async (req, res) => {
         res.status(500).json({ erreur: 'Erreur serveur' });
     }
 });
-
+// GET prestataire par user_id
+router.get('/user/:userId', verifierToken, async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const result = await pool.query(
+      'SELECT * FROM prestataires WHERE user_id=$1',
+      [userId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ erreur: 'Prestataire introuvable' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erreur: 'Erreur serveur' });
+  }
+});
 // POST — créer une reservation
 router.post('/', verifierToken, async (req, res) => {
     try {
