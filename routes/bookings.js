@@ -20,7 +20,9 @@ router.get('/', verifierToken, async (req, res) => {
         } else if (role === 'prestataire') {
             result = await pool.query(`
                 SELECT b.*, s.nom as service_nom,
-                u.nom as client_nom, u.telephone as client_telephone
+                u.nom as client_nom, u.telephone as client_telephone,
+                u.latitude as client_latitude, u.longitude as client_longitude,
+                u.adresse as client_adresse
                 FROM bookings b 
                 JOIN services s ON b.service_id = s.id
                 JOIN users u ON b.user_id = u.id
