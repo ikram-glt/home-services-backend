@@ -11,43 +11,44 @@ router.get('/', verifierToken, async (req, res) => {
         let result;
 
         if (role === 'admin') {
-            // Admin voit tout
             result = await pool.query(`
                 SELECT b.*, s.nom as service_nom 
                 FROM bookings b 
                 JOIN services s ON b.service_id = s.id 
                 ORDER BY b.created_at DESC
             `);
-                } else if (role === 'prestataire') {
+        } else if (role === 'prestataire') {
             result = await pool.query(`
-                SELECT b.*, s.nom as service_nom 
+                SELECT b.*, s.nom as service_nom,
+                u.nom as client_nom, u.telephone as client_telephone
                 FROM bookings b 
                 JOIN services s ON b.service_id = s.id
+                JOIN users u ON b.user_id = u.id
                 JOIN prestataires p ON p.user_id = $1
                 WHERE (
                     b.status = 'en_attente' 
                     AND LOWER(s.categorie) = LOWER(p.specialite)
                 )
                 OR b.prestataire_id = $1
+                OR b.prestataire_user_id = $1
                 OR (
                     b.status IN ('termine', 'refuse')
                     AND LOWER(s.categorie) = LOWER(p.specialite)
                 )
                 ORDER BY b.created_at DESC
             `, [userId]);
-        }else {
-            // Client voit seulement SES reservations
+        } else {
             result = await pool.query(`
-    SELECT b.*, s.nom as service_nom,
-    p.user_id as prestataire_user_id,
-    u.nom as prestataire_nom
-    FROM bookings b 
-    JOIN services s ON b.service_id = s.id
-    LEFT JOIN prestataires p ON b.prestataire_id = p.id
-    LEFT JOIN users u ON p.user_id = u.id
-    WHERE b.user_id = $1
-    ORDER BY b.created_at DESC
-`, [userId]);
+                SELECT b.*, s.nom as service_nom,
+                p.user_id as prestataire_user_id,
+                u.nom as prestataire_nom
+                FROM bookings b 
+                JOIN services s ON b.service_id = s.id
+                LEFT JOIN prestataires p ON b.prestataire_id = p.id
+                LEFT JOIN users u ON p.user_id = u.id
+                WHERE b.user_id = $1
+                ORDER BY b.created_at DESC
+            `, [userId]);
         }
 
         res.json(result.rows);
@@ -65,7 +66,6 @@ router.post('/', verifierToken, async (req, res) => {
             return res.status(400).json({ erreur: 'donnees obligatoires' });
         }
 
-        // Classifier l'urgence
         const { classerUrgence } = require('../algorithmes/urgencyClassifier');
         const urgence = description_intervention 
             ? classerUrgence(description_intervention) 
@@ -79,7 +79,6 @@ router.post('/', verifierToken, async (req, res) => {
             [user_id, service_id, date, heure, description_intervention, estUrgent, urgence.label]
         );
 
-        // Notif pour le client
         const service = await pool.query(
             'SELECT nom FROM services WHERE id = $1', [service_id]
         );
@@ -122,11 +121,11 @@ router.patch('/:id/status', verifierToken, async (req, res) => {
         let result;
 
         if (status === 'confirme') {
-    result = await pool.query(
-        'UPDATE bookings SET status=$1, prestataire_id=$2, prestataire_user_id=$2 WHERE id=$3 RETURNING *',
-        [status, userId, id]
-    );
-} else {
+            result = await pool.query(
+                'UPDATE bookings SET status=$1, prestataire_id=$2, prestataire_user_id=$2 WHERE id=$3 RETURNING *',
+                [status, userId, id]
+            );
+        } else {
             result = await pool.query(
                 'UPDATE bookings SET status=$1 WHERE id=$2 RETURNING *',
                 [status, id]
@@ -135,7 +134,6 @@ router.patch('/:id/status', verifierToken, async (req, res) => {
 
         const booking = result.rows[0];
 
-        // Notif au client selon le statut
         let message = '';
         if (status === 'confirme') {
             message = 'Votre reservation a ete acceptee par le prestataire !';
