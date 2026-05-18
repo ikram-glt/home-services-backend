@@ -153,4 +153,56 @@ router.patch('/:id', verifierToken, async (req, res) => {
     }
 });
 
+// GET services du prestataire
+router.get('/:id/services', async (req, res) => {
+    try {
+        const id = req.params.id;
+        const result = await pool.query(`
+            SELECT ps.id, ps.tarif, s.id as service_id, s.nom, s.description, s.categorie
+            FROM prestataire_services ps
+            JOIN services s ON ps.service_id = s.id
+            WHERE ps.prestataire_id = $1
+            ORDER BY s.nom
+        `, [id]);
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ erreur: 'Erreur serveur' });
+    }
+});
+
+// POST ajouter service au prestataire
+router.post('/:id/services', verifierToken, async (req, res) => {
+    try {
+        const id = req.params.id;
+        const { service_id, tarif } = req.body;
+        const result = await pool.query(`
+            INSERT INTO prestataire_services (prestataire_id, service_id, tarif)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (prestataire_id, service_id) 
+            DO UPDATE SET tarif = $3
+            RETURNING *
+        `, [id, service_id, tarif]);
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ erreur: 'Erreur serveur' });
+    }
+});
+
+// DELETE supprimer service du prestataire
+router.delete('/:id/services/:serviceId', verifierToken, async (req, res) => {
+    try {
+        const { id, serviceId } = req.params;
+        await pool.query(`
+            DELETE FROM prestataire_services 
+            WHERE prestataire_id = $1 AND service_id = $2
+        `, [id, serviceId]);
+        res.json({ message: 'Service supprime !' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ erreur: 'Erreur serveur' });
+    }
+});
+
 module.exports = router;
