@@ -26,16 +26,14 @@ router.get('/', verifierToken, async (req, res) => {
                 FROM bookings b 
                 JOIN services s ON b.service_id = s.id
                 JOIN users u ON b.user_id = u.id
-                JOIN prestataires p ON p.user_id = $1
-                WHERE (
-                    b.status = 'en_attente' 
-                    AND LOWER(s.categorie) = LOWER(p.specialite)
+                WHERE b.prestataire_user_id = $1
+                OR (
+                    b.status = 'confirme'
+                    AND b.prestataire_id = $1
                 )
-                OR b.prestataire_id = $1
-                OR b.prestataire_user_id = $1
                 OR (
                     b.status IN ('termine', 'refuse')
-                    AND LOWER(s.categorie) = LOWER(p.specialite)
+                    AND b.prestataire_user_id = $1
                 )
                 ORDER BY b.created_at DESC
             `, [userId]);
@@ -59,27 +57,11 @@ router.get('/', verifierToken, async (req, res) => {
         res.status(500).json({ erreur: 'Erreur serveur' });
     }
 });
-// GET prestataire par user_id
-router.get('/user/:userId', verifierToken, async (req, res) => {
-  try {
-    const userId = req.params.userId;
-    const result = await pool.query(
-      'SELECT * FROM prestataires WHERE user_id=$1',
-      [userId]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ erreur: 'Prestataire introuvable' });
-    }
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ erreur: 'Erreur serveur' });
-  }
-});
+
 // POST — créer une reservation
 router.post('/', verifierToken, async (req, res) => {
     try {
-        const { user_id, service_id, date, heure, description_intervention } = req.body;
+        const { user_id, service_id, date, heure, description_intervention, prestataire_user_id } = req.body;
         if (!user_id || !service_id || !date) {
             return res.status(400).json({ erreur: 'donnees obligatoires' });
         }
@@ -92,9 +74,9 @@ router.post('/', verifierToken, async (req, res) => {
 
         const booking = await pool.query(
             `INSERT INTO bookings 
-             (user_id, service_id, date, heure, description_intervention, est_urgent, niveau_urgence) 
-             VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-            [user_id, service_id, date, heure, description_intervention, estUrgent, urgence.label]
+             (user_id, service_id, date, heure, description_intervention, est_urgent, niveau_urgence, prestataire_user_id) 
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+            [user_id, service_id, date, heure, description_intervention, estUrgent, urgence.label, prestataire_user_id || null]
         );
 
         const service = await pool.query(
@@ -109,6 +91,14 @@ router.post('/', verifierToken, async (req, res) => {
             'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
             [user_id, notifMsg]
         );
+
+        // Notifier le prestataire
+        if (prestataire_user_id) {
+            await pool.query(
+                'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
+                [prestataire_user_id, `Nouvelle demande de service : ${serviceNom}`]
+            );
+        }
 
         res.status(201).json(booking.rows[0]);
     } catch (err) {
