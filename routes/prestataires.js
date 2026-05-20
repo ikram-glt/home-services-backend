@@ -125,10 +125,10 @@ router.get('/:id', async (req, res) => {
 // POST — créer un profil prestataire
 router.post('/', verifierToken, async (req, res) => {
     try {
-        const { user_id, specialite, disponible } = req.body;
+        const { user_id, specialite, disponible, entreprise } = req.body;
         const result = await pool.query(
-            'INSERT INTO prestataires (user_id, specialite, disponible) VALUES ($1, $2, $3) RETURNING *',
-            [user_id, specialite, disponible ?? true]
+            'INSERT INTO prestataires (user_id, specialite, disponible, entreprise) VALUES ($1, $2, $3, $4) RETURNING *',
+            [user_id, specialite, disponible ?? true, entreprise || null]
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {

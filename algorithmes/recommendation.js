@@ -37,6 +37,7 @@ async function recommanderPrestataires(serviceId, clientLat, clientLon) {
 
             return {
                 id:          p.id,
+                user_id:     p.user_id,  // ← ajoute
                 nom:         p.nom,
                 specialite:  p.specialite,
                 noteMoyenne: parseFloat(noteMoyenne),
