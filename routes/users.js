@@ -7,7 +7,7 @@ router.get('/:id', verifierToken, async (req, res) => {
     try {
         const id = req.params.id;
         const result = await pool.query(
-            'SELECT id, nom, email, telephone, role FROM users WHERE id=$1',
+            'SELECT id, nom, email, telephone, role, latitude, longitude, adresse FROM users WHERE id=$1',
             [id]
         );
         if (result.rows.length === 0) {
