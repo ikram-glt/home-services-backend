@@ -32,22 +32,18 @@ const getCategory = (f) => FAULT_CATEGORIES[f] || 'Reparation electromenager';
 // --- Crée un booking automatique depuis une panne IoT --------
 async function createIoTBooking(clientId, data) {
   try {
-    // 1. Trouver un service correspondant à la catégorie
+    // Chercher un service directement par categorie
     const category = getCategory(data.faultType);
     const serviceRes = await pool.query(
-      `SELECT s.id FROM services s
-       JOIN categories c ON s.categorie_id = c.id
-       WHERE c.nom ILIKE $1
-       LIMIT 1`,
+      `SELECT id FROM services WHERE LOWER(categorie) LIKE LOWER($1) AND est_actif = true LIMIT 1`,
       [`%${category.split('/')[0].trim()}%`]
     );
 
-    // Si aucun service trouvé, on prend le premier service disponible
     let serviceId;
     if (serviceRes.rows.length > 0) {
       serviceId = serviceRes.rows[0].id;
     } else {
-      const fallback = await pool.query('SELECT id FROM services LIMIT 1');
+      const fallback = await pool.query('SELECT id FROM services WHERE est_actif = true LIMIT 1');
       if (fallback.rows.length === 0) return null;
       serviceId = fallback.rows[0].id;
     }
@@ -57,7 +53,6 @@ async function createIoTBooking(clientId, data) {
     const today       = new Date().toISOString().split('T')[0];
     const isUrgent    = data.severity === 'urgent';
 
-    // 2. Créer le booking
     const bookingRes = await pool.query(
       `INSERT INTO bookings
          (user_id, service_id, date, heure, description_intervention,
@@ -77,13 +72,12 @@ async function createIoTBooking(clientId, data) {
 
     const booking = bookingRes.rows[0];
 
-    // 3. Notifier le client
     await pool.query(
-      'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
-      [clientId, `Panne IoT detectee : ${label} sur ${data.deviceName}. Une demande d'intervention a ete creee automatiquement.`]
+      `INSERT INTO notifications (user_id, message) VALUES ($1, $2)`,
+      [clientId, `Panne IoT detectee : ${label} sur ${data.deviceName}. Une demande d intervention a ete creee automatiquement.`]
     );
 
-    console.log(`[IoT] Booking cree automatiquement : id=${booking.id} pour client ${clientId}`);
+    console.log(`[IoT] Booking cree : id=${booking.id} pour client ${clientId}`);
     return booking;
 
   } catch (err) {
@@ -130,17 +124,15 @@ router.post('/register', async (req, res) => {
   const onFault = async (data) => {
     console.log(`[IoT] PANNE - client ${clientId} | ${data.deviceName} | ${data.faultType}`);
 
-    // Crée le booking automatiquement en base
     const booking = await createIoTBooking(parseInt(clientId), data);
 
     const enrichedData = {
       ...data,
-      id:       booking?.id || null,   // ← id du booking pour accepter/refuser
+      id:       booking?.id || null,
       label:    FAULT_LABELS[data.faultType] || data.faultType,
       category: getCategory(data.faultType),
     };
 
-    // Notifie le mobile via Socket.io
     io.to(`client_${clientId}`).emit('iot:panne_detectee', enrichedData);
   };
 
@@ -221,7 +213,6 @@ router.post('/simulate-fault', (req, res) => {
 
 
 // --- POST /api/iot/accepter ----------------------------------
-// Client accepte l'intervention → booking passe en 'en_attente' visible
 router.post('/accepter', async (req, res) => {
   const { demandeId } = req.body;
   if (!demandeId) return res.status(400).json({ success: false });
@@ -240,7 +231,6 @@ router.post('/accepter', async (req, res) => {
 
 
 // --- POST /api/iot/refuser -----------------------------------
-// Client refuse → booking supprimé
 router.post('/refuser', async (req, res) => {
   const { demandeId } = req.body;
   if (!demandeId) return res.status(400).json({ success: false });
