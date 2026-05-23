@@ -27,7 +27,7 @@ const FAULT_CATEGORIES = {
   compresseur_defaillant: 'Electricite / Electromenager',
   fuite_refrigerant:      'Electricite / Electromenager',
 };
-const getCategory = (f) => FAULT_CATEGORIES[f] || 'Reparation electromenager';
+const getCategory = (f) => 'reparation';
 
 // --- Crée un booking automatique depuis une panne IoT --------
 async function createIoTBooking(clientId, data) {
@@ -50,13 +50,16 @@ async function createIoTBooking(clientId, data) {
 
     // Trouver le meilleur prestataire disponible pour cette categorie
     const prestaRes = await pool.query(
-      `SELECT p.user_id FROM prestataires p
-       WHERE p.disponible = true
-       AND LOWER(p.specialite) LIKE LOWER($1)
-       ORDER BY p.note_moyenne DESC NULLS LAST
-       LIMIT 1`,
-      [`%${category.split('/')[0].trim()}%`]
-    );
+  `SELECT DISTINCT p.user_id 
+   FROM prestataires p
+   JOIN prestataire_services ps ON ps.prestataire_id = p.id
+   JOIN services s ON s.id = ps.service_id
+   WHERE p.disponible = true
+   AND LOWER(s.categorie) = LOWER($1)
+   ORDER BY p.user_id
+   LIMIT 1`,
+  [category]
+);
     const prestataireUserId = prestaRes.rows[0]?.user_id || null;
     console.log(`[IoT] Prestataire assigne : user_id=${prestataireUserId}`);
 
