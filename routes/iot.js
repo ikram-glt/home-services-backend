@@ -48,6 +48,18 @@ async function createIoTBooking(clientId, data) {
       serviceId = fallback.rows[0].id;
     }
 
+    // Trouver le meilleur prestataire disponible pour cette categorie
+    const prestaRes = await pool.query(
+      `SELECT p.user_id FROM prestataires p
+       WHERE p.disponible = true
+       AND LOWER(p.specialite) LIKE LOWER($1)
+       ORDER BY p.note_moyenne DESC NULLS LAST
+       LIMIT 1`,
+      [`%${category.split('/')[0].trim()}%`]
+    );
+    const prestataireUserId = prestaRes.rows[0]?.user_id || null;
+    console.log(`[IoT] Prestataire assigne : user_id=${prestataireUserId}`);
+
     const label       = FAULT_LABELS[data.faultType] || data.faultType;
     const description = `[IoT] Panne automatique detectee sur ${data.deviceName} : ${label}`;
     const today       = new Date().toISOString().split('T')[0];
@@ -56,8 +68,8 @@ async function createIoTBooking(clientId, data) {
     const bookingRes = await pool.query(
       `INSERT INTO bookings
          (user_id, service_id, date, heure, description_intervention,
-          est_urgent, niveau_urgence, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'en_attente')
+          est_urgent, niveau_urgence, status, prestataire_user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'en_attente', $8)
        RETURNING *`,
       [
         clientId,
@@ -67,15 +79,25 @@ async function createIoTBooking(clientId, data) {
         description,
         isUrgent,
         isUrgent ? 'Urgente' : 'Normale',
+        prestataireUserId,
       ]
     );
 
     const booking = bookingRes.rows[0];
 
+    // Notifier le client
     await pool.query(
       `INSERT INTO notifications (user_id, message) VALUES ($1, $2)`,
       [clientId, `Panne IoT detectee : ${label} sur ${data.deviceName}. Une demande d intervention a ete creee automatiquement.`]
     );
+
+    // Notifier le prestataire
+    if (prestataireUserId) {
+      await pool.query(
+        `INSERT INTO notifications (user_id, message) VALUES ($1, $2)`,
+        [prestataireUserId, `Nouvelle demande IoT urgente : ${label} sur ${data.deviceName}.`]
+      );
+    }
 
     console.log(`[IoT] Booking cree : id=${booking.id} pour client ${clientId}`);
     return booking;
