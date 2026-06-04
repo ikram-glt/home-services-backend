@@ -30,6 +30,8 @@ router.get('/', async (req, res) => {
             SELECT p.*, u.nom, u.email
             FROM prestataires p
             JOIN users u ON p.user_id = u.id
+            WHERE p.disponible = true
+            AND p.est_verifie = true
         `);
         res.json(resultat.rows);
     } catch (err) {
