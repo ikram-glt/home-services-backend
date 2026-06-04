@@ -298,4 +298,45 @@ router.post('/resolve-fault', (req, res) => {
   res.json({ success: true, message: `${device.name} marque comme repare` });
 });
 
+
+// --- GET /api/iot/best-prestataire/:faultType ----------------
+router.get('/best-prestataire/:faultType', async (req, res) => {
+  const { faultType } = req.params;
+  const category = getCategory(faultType);
+
+  try {
+    const result = await pool.query(
+      `SELECT
+         u.id,
+         u.nom,
+         u.email,
+         u.telephone,
+         p.note_moyenne,
+         p.disponible,
+         p.competences,
+         COUNT(b.id) FILTER (WHERE b.status = 'termine') AS missions_terminees
+       FROM prestataires p
+       JOIN users u ON p.user_id = u.id
+       LEFT JOIN bookings b ON b.prestataire_user_id = u.id
+       JOIN prestataire_services ps ON ps.prestataire_id = p.id
+       JOIN services s ON s.id = ps.service_id
+       WHERE p.disponible = true
+       AND LOWER(s.categorie) LIKE LOWER($1)
+       GROUP BY u.id, u.nom, u.email, u.telephone, p.note_moyenne, p.disponible, p.competences
+       ORDER BY p.note_moyenne DESC
+       LIMIT 1`,
+      [`%${category.split('/')[0].trim()}%`]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Aucun prestataire disponible' });
+    }
+
+    res.json({ success: true, prestataire: result.rows[0] });
+  } catch (err) {
+    console.error('[IoT] Erreur best-prestataire :', err);
+    res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+});
+
 module.exports = router;
