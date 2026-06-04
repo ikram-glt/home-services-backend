@@ -20,14 +20,19 @@ const FAULT_LABELS = {
 };
 
 const FAULT_CATEGORIES = {
-  surchauffe:             'Electricite / Electromenager',
-  fuite_eau:              'Plomberie',
-  erreur_vidange:         'Plomberie',
-  court_circuit:          'Electricite / Electromenager',
-  compresseur_defaillant: 'Electricite / Electromenager',
-  fuite_refrigerant:      'Electricite / Electromenager',
+  surchauffe:             'reparation',
+  fuite_eau:              'reparation',
+  erreur_vidange:         'reparation',
+  court_circuit:          'reparation',
+  compresseur_defaillant: 'reparation',
+  fuite_refrigerant:      'reparation',
+  vibration_excessive:    'reparation',
+  blocage_tambour:        'reparation',
+  temperature_elevee:     'reparation',
+  givre_excessif:         'reparation',
+  ventilateur_bloque:     'reparation',
 };
-const getCategory = (f) => 'reparation';
+const getCategory = (f) => FAULT_CATEGORIES[f] || 'reparation';
 
 // --- Crée un booking automatique depuis une panne IoT --------
 async function createIoTBooking(clientId, data) {
