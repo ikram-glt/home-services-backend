@@ -48,18 +48,41 @@ async function createIoTBooking(clientId, data) {
       serviceId = fallback.rows[0].id;
     }
 
-    // Trouver le meilleur prestataire disponible pour cette categorie
-    const prestaRes = await pool.query(
-  `SELECT DISTINCT p.user_id 
-   FROM prestataires p
-   JOIN prestataire_services ps ON ps.prestataire_id = p.id
-   JOIN services s ON s.id = ps.service_id
-   WHERE p.disponible = true
-   AND LOWER(s.categorie) = LOWER($1)
-   ORDER BY p.user_id
-   LIMIT 1`,
-  [category]
-);
+    // Trouver le meilleur prestataire disponible via prestataire_services
+    let prestaRes = await pool.query(
+      `SELECT DISTINCT p.user_id 
+       FROM prestataires p
+       JOIN prestataire_services ps ON ps.prestataire_id = p.id
+       JOIN services s ON s.id = ps.service_id
+       WHERE p.disponible = true
+       AND LOWER(s.categorie) = LOWER($1)
+       ORDER BY p.user_id
+       LIMIT 1`,
+      [category]
+    );
+
+    // Fallback — chercher par specialite directement
+    if (prestaRes.rows.length === 0) {
+      prestaRes = await pool.query(
+        `SELECT user_id FROM prestataires 
+         WHERE disponible = true
+         AND LOWER(specialite) = LOWER($1)
+         ORDER BY note_moyenne DESC NULLS LAST
+         LIMIT 1`,
+        [category]
+      );
+    }
+
+    // Fallback final — premier prestataire disponible avec meilleure note
+    if (prestaRes.rows.length === 0) {
+      prestaRes = await pool.query(
+        `SELECT user_id FROM prestataires 
+         WHERE disponible = true
+         ORDER BY note_moyenne DESC NULLS LAST
+         LIMIT 1`
+      );
+    }
+
     const prestataireUserId = prestaRes.rows[0]?.user_id || null;
     console.log(`[IoT] Prestataire assigne : user_id=${prestataireUserId}`);
 
@@ -110,7 +133,6 @@ async function createIoTBooking(clientId, data) {
     return null;
   }
 }
-
 
 // --- POST /api/iot/register ----------------------------------
 router.post('/register', async (req, res) => {

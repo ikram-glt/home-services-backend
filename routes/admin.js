@@ -35,6 +35,7 @@ router.delete('/users/:id', verifierToken, verifierRole('admin'), async (req, re
     try {
         const id = req.params.id;
 
+        // Supprimer dans l'ordre correct
         // 1. Supprimer les réclamations liées aux bookings de l'utilisateur
         await pool.query(`
             DELETE FROM reclamations 
@@ -52,28 +53,13 @@ router.delete('/users/:id', verifierToken, verifierRole('admin'), async (req, re
         // 4. Supprimer les notifications de l'utilisateur
         await pool.query('DELETE FROM notifications WHERE user_id = $1', [id]);
 
-        // 5. Récupérer l'id du prestataire
-        const prestaResult = await pool.query('SELECT id FROM prestataires WHERE user_id = $1', [id]);
-        const prestataireId = prestaResult.rows[0]?.id;
-
-        if (prestataireId) {
-            await pool.query('UPDATE bookings SET prestataire_id = NULL WHERE prestataire_id = $1', [prestataireId]);
-            await pool.query('DELETE FROM prestataire_services WHERE prestataire_id = $1', [prestataireId]);
-        }
-
-        // 6. Mettre prestataire_user_id à NULL
-        await pool.query('UPDATE bookings SET prestataire_user_id = NULL WHERE prestataire_user_id = $1', [id]);
-
-        // 7. Supprimer les messages
-        await pool.query('DELETE FROM messages WHERE sender_id = $1 OR receiver_id = $1', [id]);
-
-        // 8. Supprimer les bookings de l'utilisateur
+        // 5. Supprimer les bookings de l'utilisateur
         await pool.query('DELETE FROM bookings WHERE user_id = $1', [id]);
 
-        // 9. Supprimer le prestataire si existe
+        // 6. Supprimer le prestataire si existe
         await pool.query('DELETE FROM prestataires WHERE user_id = $1', [id]);
 
-        // 10. Supprimer l'utilisateur
+        // 7. Supprimer l'utilisateur
         await pool.query('DELETE FROM users WHERE id = $1', [id]);
 
         res.json({ message: 'Utilisateur supprime !' });
@@ -82,6 +68,7 @@ router.delete('/users/:id', verifierToken, verifierRole('admin'), async (req, re
         res.status(500).json({ erreur: 'Erreur serveur' });
     }
 });
+
 router.delete('/reviews/:id',verifierToken, verifierRole('admin'),async(req,res)=>{
     try{
         const id=req.params.id
