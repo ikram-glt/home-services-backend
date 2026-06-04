@@ -252,7 +252,20 @@ router.post('/accepter', async (req, res) => {
       `UPDATE bookings SET status = 'en_attente' WHERE id = $1`,
       [demandeId]
     );
-    res.json({ success: true, message: 'Intervention acceptee' });
+
+    // Récupérer le prestataire assigné à CE booking
+    const result = await pool.query(
+      `SELECT u.id, u.nom, u.email, u.telephone,
+              p.note_moyenne, p.disponible, p.competences
+       FROM bookings b
+       JOIN users u ON u.id = b.prestataire_user_id
+       JOIN prestataires p ON p.user_id = u.id
+       WHERE b.id = $1`,
+      [demandeId]
+    );
+
+    const prestataire = result.rows[0] || null;
+    res.json({ success: true, message: 'Intervention acceptee', prestataire });
   } catch (err) {
     console.error('[IoT] Erreur accepter :', err);
     res.status(500).json({ success: false });
