@@ -20,19 +20,14 @@ const FAULT_LABELS = {
 };
 
 const FAULT_CATEGORIES = {
-  surchauffe:             'reparation',
-  fuite_eau:              'reparation',
-  erreur_vidange:         'reparation',
-  court_circuit:          'reparation',
-  compresseur_defaillant: 'reparation',
-  fuite_refrigerant:      'reparation',
-  vibration_excessive:    'reparation',
-  blocage_tambour:        'reparation',
-  temperature_elevee:     'reparation',
-  givre_excessif:         'reparation',
-  ventilateur_bloque:     'reparation',
+  surchauffe:             'Electricite / Electromenager',
+  fuite_eau:              'Plomberie',
+  erreur_vidange:         'Plomberie',
+  court_circuit:          'Electricite / Electromenager',
+  compresseur_defaillant: 'Electricite / Electromenager',
+  fuite_refrigerant:      'Electricite / Electromenager',
 };
-const getCategory = (f) => FAULT_CATEGORIES[f] || 'reparation';
+const getCategory = (f) => 'reparation';
 
 // --- Crée un booking automatique depuis une panne IoT --------
 async function createIoTBooking(clientId, data) {
@@ -252,20 +247,7 @@ router.post('/accepter', async (req, res) => {
       `UPDATE bookings SET status = 'en_attente' WHERE id = $1`,
       [demandeId]
     );
-
-    // Récupérer le prestataire assigné à CE booking
-    const result = await pool.query(
-      `SELECT u.id, u.nom, u.email, u.telephone,
-              p.note_moyenne, p.disponible, p.competences
-       FROM bookings b
-       JOIN users u ON u.id = b.prestataire_user_id
-       JOIN prestataires p ON p.user_id = u.id
-       WHERE b.id = $1`,
-      [demandeId]
-    );
-
-    const prestataire = result.rows[0] || null;
-    res.json({ success: true, message: 'Intervention acceptee', prestataire });
+    res.json({ success: true, message: 'Intervention acceptee' });
   } catch (err) {
     console.error('[IoT] Erreur accepter :', err);
     res.status(500).json({ success: false });
@@ -314,47 +296,6 @@ router.post('/resolve-fault', (req, res) => {
   });
 
   res.json({ success: true, message: `${device.name} marque comme repare` });
-});
-
-
-// --- GET /api/iot/best-prestataire/:faultType ----------------
-router.get('/best-prestataire/:faultType', async (req, res) => {
-  const { faultType } = req.params;
-  const category = getCategory(faultType);
-
-  try {
-    const result = await pool.query(
-      `SELECT
-         u.id,
-         u.nom,
-         u.email,
-         u.telephone,
-         p.note_moyenne,
-         p.disponible,
-         p.competences,
-         COUNT(b.id) FILTER (WHERE b.status = 'termine') AS missions_terminees
-       FROM prestataires p
-       JOIN users u ON p.user_id = u.id
-       LEFT JOIN bookings b ON b.prestataire_user_id = u.id
-       JOIN prestataire_services ps ON ps.prestataire_id = p.id
-       JOIN services s ON s.id = ps.service_id
-       WHERE p.disponible = true
-       AND LOWER(s.categorie) LIKE LOWER($1)
-       GROUP BY u.id, u.nom, u.email, u.telephone, p.note_moyenne, p.disponible, p.competences
-       ORDER BY p.note_moyenne DESC
-       LIMIT 1`,
-      [`%${category.split('/')[0].trim()}%`]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Aucun prestataire disponible' });
-    }
-
-    res.json({ success: true, prestataire: result.rows[0] });
-  } catch (err) {
-    console.error('[IoT] Erreur best-prestataire :', err);
-    res.status(500).json({ success: false, message: 'Erreur serveur' });
-  }
 });
 
 module.exports = router;
